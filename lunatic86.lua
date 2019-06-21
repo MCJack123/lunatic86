@@ -64,19 +64,20 @@ cpu_arch = argp["arch"]
 if is_opencomputers then
 	local shell = require("shell")
 	local filesystem = require("filesystem")
-	if filesystem.exists("emu_core.lua") then
-		dofile("platform_oc.lua")
+    if filesystem.exists("emu_core.lua") then
+        dofile("platform_oc.lua")
 	else
 		local cwd = shell.getWorkingDirectory()
 		if filesystem.exists("/usr/lib/lunatic86/emu_core.lua") then
 			shell.setWorkingDirectory("/usr/lib/lunatic86")
 		elseif filesystem.exists("/lib/lunatic86/emu_core.lua") then
 			shell.setWorkingDirectory("/lib/lunatic86")
-		end
+        end
 		dofile("platform_oc.lua")
         shell.setWorkingDirectory(cwd)
     end
 elseif is_craftos then
+    dofile(shell.resolveProgram("bitop.lua"))
     dofile(shell.resolveProgram("platform_craftos.lua"))
 else
 	dofile("platform_curses.lua")
