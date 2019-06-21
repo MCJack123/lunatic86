@@ -98,7 +98,7 @@ cpu_port_set(0x64, function(cond,val)
 		emu_debug(1, string.format("kbd 0064: read"))
 		local v = kbd_status | (kbd_a2 << 3)
 		if #kbd_data_queue > 0 then
-			kbd_status = kbd_status ~ 3
+			kbd_status = bit.bxor(kbd_status, 3)
 		else
 			kbd_status = kbd_status & (0xFC)
 		end

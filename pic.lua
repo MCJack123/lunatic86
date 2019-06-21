@@ -34,7 +34,7 @@ cpu_port_set(0x20, function(cond, val)
 		if next_20 == 0x0A then
 			return pic_irr
 		elseif next_20 == 0x0B then
-			pic_isr = pic_isr ~ 0xFF
+			pic_isr = bit.bxor(pic_isr, 0xFF)
 			return pic_isr
 		elseif next_20 == 0x20 then
 			-- TODO

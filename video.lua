@@ -195,7 +195,7 @@ cpu_port_set(0x3D9, function(cond, val)
 end)
 cpu_port_set(0x3DA, function(cond, val)
 	if not val then
-		cga_status = cga_status ~ 0x09
+		cga_status = bit.bxor(cga_status, 0x09)
 		return cga_status
 	end
 end)
@@ -329,7 +329,7 @@ cpu_port_set(0x3C9, function(cond, val)
 		return (video_vga_get_palette_orig(idx) >> (shift)) & 0xFF
 	elseif val and dac_write then
 		dac_pal_idx = math.floor((dac_pal_idx + 1) % 768)
-		local pal = video_vga_get_palette_orig(idx) & (mask ~ 0xFFFFFF)
+		local pal = video_vga_get_palette_orig(idx) & bit.bxor(mask, 0xFFFFFF)
 		pal = pal | ((val & 0xFF) << shift)
 		video_vga_set_palette(idx, (pal >> 16) & 0xFF, (pal >> 8) & 0xFF, pal & 0xFF)
 	elseif not val then return 0 end

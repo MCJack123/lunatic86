@@ -11,6 +11,7 @@ function has_module(m)
 end
 
 local is_opencomputers = has_module("component")
+local is_craftos = type(shell) == "table"
 
 -- defaults
 argp["boot"] = "a"
@@ -73,8 +74,10 @@ if is_opencomputers then
 			shell.setWorkingDirectory("/lib/lunatic86")
 		end
 		dofile("platform_oc.lua")
-		shell.setWorkingDirectory(cwd)
-	end
+        shell.setWorkingDirectory(cwd)
+    end
+elseif is_craftos then
+    dofile(shell.resolveProgram("platform_craftos.lua"))
 else
 	dofile("platform_curses.lua")
 end
@@ -88,7 +91,11 @@ end
 disk_boot(drive_map[argp["boot"]])
 
 xpcall(function()
-	emu_execute()
+    if is_craftos then
+        parallel.waitForAny(emu_execute, platform_event_loop)
+    else
+        emu_execute()
+    end
 end, function(err)
 	platform_error(err)
 end)

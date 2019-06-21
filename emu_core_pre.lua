@@ -644,16 +644,16 @@ local function cpu_rotate(mrm, opcode, mode)
 	local shifts = v1
 	if shifts > 0 then
 		if mode == ROTATE_MODE_ROR then
-			shifts = shifts & shift
-			local shiftmask = (1 << shifts) - 1
-			cf = (vr >> ((shifts - 1) & shift)) & 0x01
-			vr = (vr >> shifts) | ((vr & shiftmask) << ((shift - shifts + 1) & shift))
-			of = ((vr >> shift) ~ (vr >> (shift - 1))) & 0x01
-		elseif mode == ROTATE_MODE_ROL then
-			shifts = shifts & shift
-			cf = (vr >> ((shift - shifts + 1) & shift)) & 0x01
-			vr = ((vr << shifts) & ((1 << (shift + 1)) - 1)) | (vr >> ((shift - shifts + 1) & shift))
-			of = ((vr >> shift) ~ cf) & 0x01
+            shifts = bit32.band(shifts, shift)
+            local shiftmask = bit32.lshift(1, shifts) - 1
+            cf = bit32.band(bit32.rshift(vr, bit32.band((shifts - 1), shift)), 0x01)
+            vr = bit32.bor(bit32.rshift(vr, shifts), bit32.lshift((bit32.band(vr, shiftmask), bit32.band((shift - shifts + 1), shift))))
+            of = bit32.band(bit32.bxor(bit32.rshift(vr, shift), bit32.rshift(vr, (shift - 1))), 0x01)
+        elseif mode == ROTATE_MODE_ROL then
+            shifts = bit32.band(shifts, shift)
+            cf = bit32.band(bit32.rshift(vr, bit32.band((shift - shifts + 1), shift)), 0x01)
+            vr = bit32.bor(bit32.band(bit32.lshift(vr, shifts), (bit32.lshift(1, (shift + 1)) - 1)), bit32.rshift(vr, bit32.band((shift - shifts + 1), shift)))
+            of = bit32.band(bit32.bxor(bit32.rshift(vr, shift), cf), 0x01)
 		elseif mode == ROTATE_MODE_RCR then
 			shifts = shifts % (shift + 2)
 			while shifts > 0 do
