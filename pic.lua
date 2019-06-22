@@ -18,11 +18,11 @@ local pic_isr = 0x00
 
 function pic_interrupt_enabled(i)
 	return true
---	return (int_mask & (1 << i)) == 0
+--	return (int_mask -band- (1 -blshift- i)) == 0
 end
 
 --function pic_interrupt_sent(i)
---	pic_isr = pic_isr | (1 << i)
+--	pic_isr = pic_isr -bor- (1 -blshift- i)
 --end
 
 local next_20 = 0x00

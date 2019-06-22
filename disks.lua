@@ -3,6 +3,7 @@ local drives = {}
 RAM[0x475] = 0
 
 local function disk_init_data(fptr, d)
+    print("Loading disk...")
 	local fsize = 0
 	if fptr ~= nil then
 		fsize = fptr:seek("end")
@@ -76,13 +77,13 @@ local function disk_init_data(fptr, d)
 	-- configure table
 	local tba = 0xF2000 + d.id*16
 	if d.id == 0x80 then
-		RAM:w16(0x0104, tba & 0xFFFF)
+		RAM:w16(0x0104, tba -band- 0xFFFF)
 		RAM:w16(0x0106, 0xF000)
 	elseif d.id == 0x81 then
-		RAM:w16(0x0118, tba & 0xFFFF)
+		RAM:w16(0x0118, tba -band- 0xFFFF)
 		RAM:w16(0x011A, 0xF000)
 	elseif d.id == 0x00 then
-		RAM:w16(0x0078, tba & 0xFFFF)
+		RAM:w16(0x0078, tba -band- 0xFFFF)
 		RAM:w16(0x007A, 0xF000)
 	end
 	if d.floppy then
@@ -105,7 +106,7 @@ local function disk_init_data(fptr, d)
 		RAM[tba + 7] = 0
 		RAM[tba + 8] = 0xC0
 		if d.heads > 8 then
-			RAM[tba + 8] = RAM[tba + 8] | 0x08
+			RAM[tba + 8] = RAM[tba + 8] -bor- 0x08
 		end
 		RAM[tba + 9] = 0
 		RAM[tba + 10] = 0
@@ -129,7 +130,7 @@ function disk_init(fn, id)
 		d.ptr = function(a, mode)
 			if ptrmode ~= mode then
 				if f ~= nil then f:close() end
-				f = io.open(fn, mode)
+                f = io_seek.open(fn, mode)
 				disk_init_data(f, a)
 				f:seek("set", 0)
 				ptrmode = mode
@@ -153,9 +154,9 @@ local last_status = 0x00
 local function ret_status(v)
 	if v ~= nil then
 		emu_debug(2, "disks: setting status to " .. v)
-		last_status = v & 0xFF
+		last_status = v -band- 0xFF
 	end
-	CPU["regs"][1] = (CPU["regs"][1] & 0xFF) | (last_status << 8)
+	CPU["regs"][1] = (CPU["regs"][1] -band- 0xFF) -bor- (last_status -blshift- 8)
 	cpu_write_flag(0, last_status ~= 0)
 end
 
@@ -171,12 +172,12 @@ cpu_register_interrupt_handler(0x13, function(ax,ah,al)
 		local cx = CPU["regs"][2]
 		local dx = CPU["regs"][3]
 		local bx = CPU["regs"][4]
-		local sector = (cx & 0x3F)
-		local cylinder = (cx >> 8)
-		local head = (dx >> 8)
-		local drive = (dx & 0xFF)
+		local sector = (cx -band- 0x3F)
+		local cylinder = (cx -brshift- 8)
+		local head = (dx -brshift- 8)
+		local drive = (dx -band- 0xFF)
 		if drive >= 0x80 then
-			cylinder = cylinder | ((cx & 0xC0) << 2)
+			cylinder = cylinder -bor- ((cx -band- 0xC0) -blshift- 2)
 		end
 		local d = drives[drive]
 		if not d or d:ptr("rb") == nil then
@@ -208,12 +209,12 @@ cpu_register_interrupt_handler(0x13, function(ax,ah,al)
 		local cx = CPU["regs"][2]
 		local dx = CPU["regs"][3]
 		local bx = CPU["regs"][4]
-		local sector = (cx & 0x3F)
-		local cylinder = (cx >> 8)
-		local head = (dx >> 8)
-		local drive = (dx & 0xFF)
+		local sector = (cx -band- 0x3F)
+		local cylinder = (cx -brshift- 8)
+		local head = (dx -brshift- 8)
+		local drive = (dx -band- 0xFF)
 		if drive >= 0x80 then
-			cylinder = cylinder | ((cx & 0xC0) << 2)
+			cylinder = cylinder -bor- ((cx -band- 0xC0) -blshift- 2)
 		end
 		local d = drives[drive]
 		if not d or d:ptr("ab") == nil then
@@ -241,12 +242,12 @@ cpu_register_interrupt_handler(0x13, function(ax,ah,al)
 		ret_status(0)
 		return true
 	elseif ah == 0x04 then -- verify
-		local drive = CPU["regs"][3] & 0xFF
+		local drive = CPU["regs"][3] -band- 0xFF
 		emu_debug(1, string.format("disks: verify drive %02X", drive))
 		ret_status(0)
 		return true
 	elseif ah == 0x08 then -- get drive parameters
-		local drive = CPU["regs"][3] & 0xFF
+		local drive = CPU["regs"][3] -band- 0xFF
 		local d = drives[drive]
 		if not d or d:ptr("rb") == nil then
 			ret_status(1)
@@ -254,26 +255,26 @@ cpu_register_interrupt_handler(0x13, function(ax,ah,al)
 			d:ptr("rb") -- init disk data
 			local maxc = d.cylinders - 1
 			local drives = RAM[0x475]
-			if d.floppy then drives = ((RAM[0x410] >> 6) & 3) + 1 end
-			CPU["regs"][2] = ((maxc & 0xFF) << 8) | (d.sectors & 0x3F) | ((maxc & 0x300) >> 2) -- CX = cylinder number | sector number
-			CPU["regs"][3] = ((d.heads - 1) << 8) | drives
+			if d.floppy then drives = ((RAM[0x410] -brshift- 6) -band- 3) + 1 end
+			CPU["regs"][2] = ((maxc -band- 0xFF) -blshift- 8) -bor- (d.sectors -band- 0x3F) -bor- ((maxc -band- 0x300) -brshift- 2) -- CX = cylinder number -bor- sector number
+			CPU["regs"][3] = ((d.heads - 1) -blshift- 8) -bor- drives
 			CPU["regs"][8] = 2000 + (drive*16)
 			CPU["segments"][SEG_ES+1] = 0xF000 -- ES:DI - hdpt ptr
 			if d.floppy then
 				if d.sectors == 18 then
-					CPU["regs"][4] = (CPU["regs"][4] & 0xFF00) | 4
+					CPU["regs"][4] = (CPU["regs"][4] -band- 0xFF00) -bor- 4
 				else
-					CPU["regs"][4] = (CPU["regs"][4] & 0xFF00) | 3
+					CPU["regs"][4] = (CPU["regs"][4] -band- 0xFF00) -bor- 3
 				end
 			else
-				CPU["regs"][4] = (CPU["regs"][4] & 0xFF00)
+				CPU["regs"][4] = (CPU["regs"][4] -band- 0xFF00)
 			end
 			ret_status(0)
 		end
 		emu_debug(1, string.format("disks: get drive parameters %02X %04X", drive, CPU["regs"][1]))
 		return true
 	elseif ah == 0x15 then -- get disk type
-		local drive = CPU["regs"][3] & 0xFF
+		local drive = CPU["regs"][3] -band- 0xFF
 		local d = drives[drive]
 		local code = 0
 		if d and d:ptr("rb") ~= nil then
@@ -281,16 +282,16 @@ cpu_register_interrupt_handler(0x13, function(ax,ah,al)
 			else code = 3 end
 		end
 		cpu_clear_flag(0) -- clear carry
-		CPU["regs"][1] = (code << 8) | (CPU["regs"][1] & 0xFF) -- AH = drive code
+		CPU["regs"][1] = (code -blshift- 8) -bor- (CPU["regs"][1] -band- 0xFF) -- AH = drive code
 		emu_debug(1, string.format("disks: get disk type %02X", drive))
 		return true
 	elseif ah == 0x18 then -- set media type for format
 		-- TODO
-		local drive = CPU["regs"][3] & 0xFF
+		local drive = CPU["regs"][3] -band- 0xFF
 		local code = 0x80
 		if drives[drive] then code = 0 end
 		cpu_clear_flag(0) -- clear carry
-		CPU["regs"][1] = (code << 8) | (CPU["regs"][1] & 0xFF) -- AH = drive code
+		CPU["regs"][1] = (code -blshift- 8) -bor- (CPU["regs"][1] -band- 0xFF) -- AH = drive code
 		emu_debug(1, string.format("disks: set media type %02X", drive))			
 		return true
 	elseif ah == 0x41 then -- check extensions present
@@ -310,6 +311,6 @@ function disk_boot(id)
 		RAM[0x7c00 + i] = bootsector:byte(i+1,i+2)
 	end
 	cpu_set_ip(0x0000, 0x7C00)
-	CPU["regs"][3] = 0x0000 | id
+	CPU["regs"][3] = 0x0000 -bor- id
 	CPU["regs"][5] = 0x8000
 end

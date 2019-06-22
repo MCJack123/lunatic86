@@ -2,7 +2,7 @@ os.setlocale('')
 
 local curses = require "curses"
 local cp437_trans = require "table_cp437"
-dofile("kbdmaps.lua")
+dofile(pwd .. "kbdmaps.lua")
 
 function platform_sleep(t)
 	-- for what pvrpose
@@ -67,7 +67,7 @@ local function platform_kbd_tick()
 		local ch, code = platform_getc()
 		if ch ~= nil then
 			kbd_send_ibm(code, ch)
---			queued_up[#queued_up+1] = {code | 0x80, ch}
+--			queued_up[#queued_up+1] = {code -bor- 0x80, ch}
 		else getmore = false end
 	end
 end
@@ -107,4 +107,4 @@ function platform_finish()
 	curses.endwin()
 end
 
-dofile("emu_core.lua")
+dofile(pwd .. "emu_core.lua")

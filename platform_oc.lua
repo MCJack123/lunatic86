@@ -10,7 +10,7 @@ end
 
 local cp437_trans = require("table_cp437")
 local oc_palette = require("table_ocpalette")
-dofile("kbdmaps.lua")
+dofile(pwd .. "kbdmaps.lua")
 
 local beeper = nil
 local beeper_count = 0
@@ -20,15 +20,15 @@ if beeper_count > 0 then beeper = component.beep end
 
 local qdr = {}
 for i=0,255 do
-  local dat = (i & 0x01) << 7
-  dat = dat | (i & 0x02) >> 1 << 6
-  dat = dat | (i & 0x04) >> 2 << 5
-  dat = dat | (i & 0x08) >> 3 << 2
-  dat = dat | (i & 0x10) >> 4 << 4
-  dat = dat | (i & 0x20) >> 5 << 1
-  dat = dat | (i & 0x40) >> 6 << 3
-  dat = dat | (i & 0x80) >> 7
-  qdr[i + 1] = unicode.char(0x2800 | dat)
+  local dat = (i -band- 0x01) -blshift- 7
+  dat = dat -bor- (i -band- 0x02) -brshift- 1 -blshift- 6
+  dat = dat -bor- (i -band- 0x04) -brshift- 2 -blshift- 5
+  dat = dat -bor- (i -band- 0x08) -brshift- 3 -blshift- 2
+  dat = dat -bor- (i -band- 0x10) -brshift- 4 -blshift- 4
+  dat = dat -bor- (i -band- 0x20) -brshift- 5 -blshift- 1
+  dat = dat -bor- (i -band- 0x40) -brshift- 6 -blshift- 3
+  dat = dat -bor- (i -band- 0x80) -brshift- 7
+  qdr[i + 1] = unicode.char(0x2800 -bor- dat)
 end
 
 function emu_debug(s)
@@ -58,7 +58,7 @@ end)
 
 local function oc_code_transform(code, char)
 	if code == 0x1C then char = 13 end
-	if code >= 0xC0 and code <= 0xDF then code = code & 0x7F end
+	if code >= 0xC0 and code <= 0xDF then code = code -band- 0x7F end
 	if code >= 0x80 then
 		-- fallback
 		code = map_char_to_key[char] or code
@@ -73,7 +73,7 @@ event.listen("key_down", function(name, addr, char, code, player)
 	if code >= 0 and code <= 0x7F then
 		if kd_matrix[code] then
 			-- release first, for autorepeat
-			kbd_send_ibm(0x80 | code, char)
+			kbd_send_ibm(0x80 -bor- code, char)
 		end
 		kd_matrix[code] = true
 		kbd_send_ibm(code, char)
@@ -84,7 +84,7 @@ event.listen("key_up", function(name, addr, char, code, player)
 	code, char = oc_code_transform(code, char)
 	if code >= 0 and code <= 0x7F then
 		kd_matrix[code] = nil
-		kbd_send_ibm(0x80 | code, char)
+		kbd_send_ibm(0x80 -bor- code, char)
 	end
 end)
 
@@ -112,8 +112,8 @@ local function dstrings_draw(dstrings, pal)
 	for _,atr in pairs(dstrkeys) do
 		local arr = dstrings[atr]
 		if pal then
-			local tbg = (atr & 0xFF00) >> 8
-			local tfg = atr & 0x00FF
+			local tbg = (atr -band- 0xFF00) -brshift- 8
+			local tfg = atr -band- 0x00FF
 			if lastBG ~= tbg then
 				gpu.setBackground(oc_palette[tbg])
 				lastBG = tbg
@@ -123,8 +123,8 @@ local function dstrings_draw(dstrings, pal)
 				lastFG = tfg
 			end
 		else
-			local tbg = (atr & 0xF0) >> 4
-			local tfg = atr & 0x0F
+			local tbg = (atr -band- 0xF0) -brshift- 4
+			local tfg = atr -band- 0x0F
 			if lastBG ~= tbg then
 				gpu.setBackground(pc_16_colors[1 + tbg])
 				lastBG = tbg
@@ -167,27 +167,27 @@ local plat_cga_mono_avg = {
 local function plat_cga_chr(v1, v2, v3, v4)
 	return qdr[1 +
 		( (plat_cga_mono_avg[v4 + 1])
-		| (plat_cga_mono_avg[v3 + 1] << 2)
-		| (plat_cga_mono_avg[v2 + 1] << 4)
-		| (plat_cga_mono_avg[v1 + 1] << 6) )
+		-bor- (plat_cga_mono_avg[v3 + 1] -blshift- 2)
+		-bor- (plat_cga_mono_avg[v2 + 1] -blshift- 4)
+		-bor- (plat_cga_mono_avg[v1 + 1] -blshift- 6) )
 	]
 end
 
 local function colorDistSq(rgb1, rgb2)
   if rgb1 == rgb2 then return 0 end
 
-  local r1 = (rgb1 >> 16) & 0xFF
-  local g1 = (rgb1 >> 8) & 0xFF
-  local b1 = (rgb1) & 0xFF
-  local r2 = (rgb2 >> 16) & 0xFF
-  local g2 = (rgb2 >> 8) & 0xFF
-  local b2 = (rgb2) & 0xFF
+  local r1 = (rgb1 -brshift- 16) -band- 0xFF
+  local g1 = (rgb1 -brshift- 8) -band- 0xFF
+  local b1 = (rgb1) -band- 0xFF
+  local r2 = (rgb2 -brshift- 16) -band- 0xFF
+  local g2 = (rgb2 -brshift- 8) -band- 0xFF
+  local b2 = (rgb2) -band- 0xFF
   local rs = (r1 - r2) * (r1 - r2)
   local gs = (g1 - g2) * (g1 - g2)
   local bs = (b1 - b2) * (b1 - b2)
   local rAvg = math.floor((r1 + r2) / 2)
 
-  return (((512 + rAvg) * rs) >> 8) + (4 * gs) + (((767 - rAvg) * bs) >> 8)
+  return (((512 + rAvg) * rs) -brshift- 8) + (4 * gs) + (((767 - rAvg) * bs) -brshift- 8)
 end
 
 local function round(v)
@@ -195,9 +195,9 @@ local function round(v)
 end
 
 local function getOCPalEntry(rgb)
-	local r = (rgb >> 16) & 0xFF
-	local g = (rgb >> 8) & 0xFF
-	local b = (rgb) & 0xFF
+	local r = (rgb -brshift- 16) -band- 0xFF
+	local g = (rgb -brshift- 8) -band- 0xFF
+	local b = (rgb) -band- 0xFF
 	if r == g and g == b then
 		local i = round(g * 16.0 / 255.0)
 		if i <= 0 then return 16 elseif i >= 16 then return 255 else return i - 1 end
@@ -258,14 +258,14 @@ local function plat_avg_chr(pixels, pal, avg_chr_mode, empty_color)
 		for i=1,8 do
 			local p = pal[pixels[i]]
 			if colorDistSq(pfg, p) < colorDistSq(pbg, p) then
-				chr = chr | (0x80 >> (i - 1))
+				chr = chr -bor- (0x80 -brshift- (i - 1))
 			end
        		end
 	elseif avg_chr_mode == AVG_CHR_1x4 then
 		for i=1,4 do
 			local p = pal[pixels[i]]
 			if colorDistSq(pfg, p) < colorDistSq(pbg, p) then
-				chr = chr | (0xC0 >> ((i - 1) << 1))
+				chr = chr -bor- (0xC0 -brshift- ((i - 1) -blshift- 1))
 			end
        		end
 	elseif avg_chr_mode == AVG_CHR_2x2 then
@@ -273,7 +273,7 @@ local function plat_avg_chr(pixels, pal, avg_chr_mode, empty_color)
 		for i=1,4 do
 			local p = pal[pixels[i]]
 			if colorDistSq(pfg, p) < colorDistSq(pbg, p) then
-				chr = chr | (0xA0 >> ash[i])
+				chr = chr -bor- (0xA0 -brshift- ash[i])
 			end
        		end
 	end
@@ -329,7 +329,7 @@ function platform_render_mcga_13h(vram, addr)
 			getOCPalEntry(video_vga_get_palette(vram[base + x*2 + 960] or 0)),
 			getOCPalEntry(video_vga_get_palette(vram[base + x*2 + 961] or 0))
 		}, oc_palette, AVG_CHR_2x4)
-		local atr = (bg << 8) | fg
+		local atr = (bg -blshift- 8) -bor- fg
 		return atr, qdr[1 + chr]
 	end)
 
@@ -345,14 +345,14 @@ function platform_render_pcjr_160(vram, addr)
 	iter_dstrings(dlines, dstrings, function(x, y)
 		local base = addr + x + y*160 -- 4/2 lines
 		local shift = 4
-		if (x & 1) == 1 then shift = 0 end
+		if (x -band- 1) == 1 then shift = 0 end
 		local bg, fg, chr = plat_avg_chr({
-			(((vram[base] or 0) >> shift) & 0x0F) + 1,
-			(((vram[base + 0x2000] or 0) >> shift) & 0x0F) + 1,
-			(((vram[base + 80] or 0) >> shift) & 0x0F) + 1,
-			(((vram[base + 80 + 0x2000] or 0) >> shift) & 0x0F) + 1
+			(((vram[base] or 0) -brshift- shift) -band- 0x0F) + 1,
+			(((vram[base + 0x2000] or 0) -brshift- shift) -band- 0x0F) + 1,
+			(((vram[base + 80] or 0) -brshift- shift) -band- 0x0F) + 1,
+			(((vram[base + 80 + 0x2000] or 0) -brshift- shift) -band- 0x0F) + 1
 		}, pc_16_colors, AVG_CHR_1x4, 1)
-		local atr = ((bg - 1) << 4) | (fg - 1)
+		local atr = ((bg - 1) -blshift- 4) -bor- (fg - 1)
 		return atr, qdr[1 + chr]
 	end)
 
@@ -367,16 +367,16 @@ function platform_render_pcjr_320(vram, addr)
 	iter_dstrings(dlines, dstrings, function(x, y)
 		local base = addr + x + y*160 -- 4/4 lines
 		local bg, fg, chr = plat_avg_chr({
-			(((vram[base] or 0) >> 4) & 0x0F) + 1,
-			(((vram[base] or 0)     ) & 0x0F) + 1,
-			(((vram[base+0x2000] or 0) >> 4) & 0x0F) + 1,
-			(((vram[base+0x2000] or 0)     ) & 0x0F) + 1,
-			(((vram[base+0x4000] or 0) >> 4) & 0x0F) + 1,
-			(((vram[base+0x4000] or 0)     ) & 0x0F) + 1,
-			(((vram[base+0x6000] or 0) >> 4) & 0x0F) + 1,
-			(((vram[base+0x6000] or 0)     ) & 0x0F) + 1
+			(((vram[base] or 0) -brshift- 4) -band- 0x0F) + 1,
+			(((vram[base] or 0)     ) -band- 0x0F) + 1,
+			(((vram[base+0x2000] or 0) -brshift- 4) -band- 0x0F) + 1,
+			(((vram[base+0x2000] or 0)     ) -band- 0x0F) + 1,
+			(((vram[base+0x4000] or 0) -brshift- 4) -band- 0x0F) + 1,
+			(((vram[base+0x4000] or 0)     ) -band- 0x0F) + 1,
+			(((vram[base+0x6000] or 0) -brshift- 4) -band- 0x0F) + 1,
+			(((vram[base+0x6000] or 0)     ) -band- 0x0F) + 1
 		}, pc_16_colors, AVG_CHR_2x4, 1)
-		local atr = ((bg - 1) << 4) | (fg - 1)
+		local atr = ((bg - 1) -blshift- 4) -bor- (fg - 1)
 		return atr, qdr[1 + chr]
 	end)
 
@@ -394,14 +394,14 @@ cga_col_pals[5] = {0, 3, 4, 7}
 local function plat_avg_chr_cga(c1, c2, c3, c4, sh, cgp)
 	local cga_col_pal = cga_col_pals[cgp]
 	local bg, fg, ch = plat_avg_chr({
-		cga_col_pal[((c1 >> (sh+2)) & 3) + 1] + 1,
-		cga_col_pal[((c1 >> sh) & 3) + 1] + 1,
-		cga_col_pal[((c2 >> (sh+2)) & 3) + 1] + 1,
-		cga_col_pal[((c2 >> sh) & 3) + 1] + 1,
-		cga_col_pal[((c3 >> (sh+2)) & 3) + 1] + 1,
-		cga_col_pal[((c3 >> sh) & 3) + 1] + 1,
-		cga_col_pal[((c4 >> (sh+2)) & 3) + 1] + 1,
-		cga_col_pal[((c4 >> sh) & 3) + 1] + 1
+		cga_col_pal[((c1 -brshift- (sh+2)) -band- 3) + 1] + 1,
+		cga_col_pal[((c1 -brshift- sh) -band- 3) + 1] + 1,
+		cga_col_pal[((c2 -brshift- (sh+2)) -band- 3) + 1] + 1,
+		cga_col_pal[((c2 -brshift- sh) -band- 3) + 1] + 1,
+		cga_col_pal[((c3 -brshift- (sh+2)) -band- 3) + 1] + 1,
+		cga_col_pal[((c3 -brshift- sh) -band- 3) + 1] + 1,
+		cga_col_pal[((c4 -brshift- (sh+2)) -band- 3) + 1] + 1,
+		cga_col_pal[((c4 -brshift- sh) -band- 3) + 1] + 1
 	}, pc_16_colors, AVG_CHR_2x4, 1)
 	return bg - 1, fg - 1, ch
 end
@@ -411,26 +411,26 @@ function platform_render_cga_color(vram, addr, mode)
 	local dlines = video_pop_dirty_lines()
 	local dstrings = {}
 
-	local cgp = (((cga_get_palette() >> 4) & 1) * 3)
+	local cgp = (((cga_get_palette() -brshift- 4) -band- 1) * 3)
 	if mode == 5 then
 		cgp = cgp + 2
 	else
-		cgp = cgp + (cga_get_palette() >> 5) & 1
+		cgp = cgp + (cga_get_palette() -brshift- 5) -band- 1
 	end
---	cga_col_pals[cgp][1] = (cga_get_palette() & 0x0F)
+--	cga_col_pals[cgp][1] = (cga_get_palette() -band- 0x0F)
 
 	dlines_scale(dlines, 2)
 	iter_dstrings(dlines, dstrings, function(x, y)
 		local base = addr + y*160
-		local xs = x >> 1
+		local xs = x -brshift- 1
 		local bg, fg, chr = plat_avg_chr_cga(
 			vram[base + xs] or 0,
 			vram[base + xs + 0x2000] or 0,
 			vram[base + xs + 80] or 0,
 			vram[base + xs + 0x2000 + 80] or 0,
-			(4 - ((x & 1) * 4)), cgp
+			(4 - ((x -band- 1) * 4)), cgp
 		)
-		local atr = (bg << 4) | fg
+		local atr = (bg -blshift- 4) -bor- fg
 		return atr, qdr[1 + chr]
 	end)
 
@@ -441,7 +441,7 @@ function platform_render_cga_mono(vram, addr)
 	gpu_set_res_diff(160, 50)
 	gpu.setBackground(pc_16_colors[1])
 	gpu.setForeground(pc_16_colors[16])
---	gpu.setForeground(pc_16_colors[(cga_get_palette() & 0x0F) + 1])
+--	gpu.setForeground(pc_16_colors[(cga_get_palette() -band- 0x0F) + 1])
 
 	local dlines = video_pop_dirty_lines()
 	for y,dline in pairs(dlines) do
@@ -454,8 +454,8 @@ function platform_render_cga_mono(vram, addr)
 			local c2 = vram[base + x + 0x2000] or 0
 			local c3 = vram[base + x + 80] or 0
 			local c4 = vram[base + x + 0x2000 + 80] or 0
-			str[#str + 1] = plat_cga_chr(c1 >> 4, c2 >> 4, c3 >> 4, c4 >> 4)
-			str[#str + 1] = plat_cga_chr(c1 & 0x0F, c2 & 0x0F, c3 & 0x0F, c4 & 0x0F)	
+			str[#str + 1] = plat_cga_chr(c1 -brshift- 4, c2 -brshift- 4, c3 -brshift- 4, c4 -brshift- 4)
+			str[#str + 1] = plat_cga_chr(c1 -band- 0x0F, c2 -band- 0x0F, c3 -band- 0x0F, c4 -band- 0x0F)	
 		end
 		gpu.set(dline[1] * 2 + 1, y + 1, table.concat(str))
 	end
@@ -479,7 +479,7 @@ function platform_render_text(vram, addr, width, height, pitch)
 			-- TO TASTE
 			if chr == 0x2593 then
 				chr = 0x2591
-				atr = (atr >> 4) | ((atr << 4) & 0xF0)
+				atr = (atr -brshift- 4) -bor- ((atr -blshift- 4) -band- 0xF0)
 			end
 
 			if lastAtr ~= atr then
@@ -505,4 +505,4 @@ end
 function platform_finish()
 end
 
-dofile("emu_core.lua")
+dofile(pwd .. "emu_core.lua")

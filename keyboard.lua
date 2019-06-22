@@ -14,7 +14,7 @@ local function populate_bitmask(kz)
 	local keys = 0
 	for i,k in ipairs(kz) do
 		if k >= 0 and platform_key_down(k) then
-			keys = keys | (1 << (i - 1))
+			keys = keys -bor- (1 -blshift- (i - 1))
 		end
 	end
 	return keys
@@ -89,18 +89,18 @@ cpu_port_set(0x61, function(cond,val)
 	else
 		emu_debug(1, "kbd port b write " .. val)
 		kbd_port_b = val
-		kbd_spkr_latch = kbd_spkr_latch | val
+		kbd_spkr_latch = kbd_spkr_latch -bor- val
 	end
 end)
 
 cpu_port_set(0x64, function(cond,val)
 	if not val then
 		emu_debug(1, string.format("kbd 0064: read"))
-		local v = kbd_status | (kbd_a2 << 3)
+		local v = kbd_status -bor- (kbd_a2 -blshift- 3)
 		if #kbd_data_queue > 0 then
 			kbd_status = bit.bxor(kbd_status, 3)
 		else
-			kbd_status = kbd_status & (0xFC)
+			kbd_status = kbd_status -band- (0xFC)
 		end
 		return v
 	else
@@ -128,7 +128,7 @@ cpu_register_interrupt_handler(0x16, function(ax,ah,al)
 			return "block"
 		else
 			cpu_clear_flag(6)
-			CPU["regs"][1] = ((bios & 0xFF) << 8) | (ascii & 0xFF)
+			CPU["regs"][1] = ((bios -band- 0xFF) -blshift- 8) -bor- (ascii -band- 0xFF)
 			return true
 		end
 	elseif (ah == 0x01) then
@@ -144,7 +144,7 @@ cpu_register_interrupt_handler(0x16, function(ax,ah,al)
 			return true
 		else
 			cpu_clear_flag(6)
-			CPU["regs"][1] = ((bios & 0xFF) << 8) | (ascii & 0xFF)
+			CPU["regs"][1] = ((bios -band- 0xFF) -blshift- 8) -bor- (ascii -band- 0xFF)
 			return true
 		end
 	elseif (ah == 0x02) then
@@ -153,7 +153,7 @@ cpu_register_interrupt_handler(0x16, function(ax,ah,al)
 			ah = RAM[0x418]
 		end
 		al = RAM[0x417]
-		CPU["regs"][1] = (ah << 8) | al
+		CPU["regs"][1] = (ah -blshift- 8) -bor- al
 		return true
 	else
 		cpu_set_flag(0)

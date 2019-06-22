@@ -13,6 +13,8 @@ end
 local is_opencomputers = has_module("component")
 local is_craftos = type(shell) == "table"
 
+if is_craftos then os.exit = error end
+
 -- defaults
 argp["boot"] = "a"
 argp["mempack"] = 0
@@ -20,7 +22,7 @@ argp["arch"] = "8086"
 
 if is_opencomputers then
 	argp["mempack"] = 3
-	if (1<<62) == 0 then argp["mempack"] = 2 end
+	if (1-blshift-62) == 0 then argp["mempack"] = 2 end
 end
 
 for i=1,#args do
@@ -57,15 +59,15 @@ if argp[argp["boot"]] == nil then
 	os.exit()
 end
 
-reduced_memory_mode = math.floor(tonumber(argp["mempack"]))
-memory_preallocate = false
-cpu_arch = argp["arch"]
+_G.reduced_memory_mode = math.floor(tonumber(argp["mempack"]))
+_G.memory_preallocate = false
+_G.cpu_arch = argp["arch"]
 
 if is_opencomputers then
 	local shell = require("shell")
 	local filesystem = require("filesystem")
     if filesystem.exists("emu_core.lua") then
-        dofile("platform_oc.lua")
+        dofile(pwd .. "platform_oc.lua")
 	else
 		local cwd = shell.getWorkingDirectory()
 		if filesystem.exists("/usr/lib/lunatic86/emu_core.lua") then
@@ -73,14 +75,15 @@ if is_opencomputers then
 		elseif filesystem.exists("/lib/lunatic86/emu_core.lua") then
 			shell.setWorkingDirectory("/lib/lunatic86")
         end
-		dofile("platform_oc.lua")
+		dofile(pwd .. "platform_oc.lua")
         shell.setWorkingDirectory(cwd)
     end
 elseif is_craftos then
-    dofile(shell.resolveProgram("bitop.lua"))
-    dofile(shell.resolveProgram("platform_craftos.lua"))
+    _G.pwd = shell.dir() .. "/"
+    dofile(pwd .. "platform_craftos.lua")
 else
-	dofile("platform_curses.lua")
+    pwd = ""
+	dofile(pwd .. "platform_curses.lua")
 end
 
 for dk,did in pairs(drive_map) do
@@ -90,15 +93,9 @@ for dk,did in pairs(drive_map) do
 end
 
 disk_boot(drive_map[argp["boot"]])
-
-xpcall(function()
-    if is_craftos then
-        parallel.waitForAny(emu_execute, platform_event_loop)
-    else
-        emu_execute()
-    end
-end, function(err)
-	platform_error(err)
-end)
-
+setEGAColors()
+term.setBackgroundColor(1)
+term.setTextColor(128)
+term.clear()
+xpcall(emu_execute, platform_error)
 platform_finish()

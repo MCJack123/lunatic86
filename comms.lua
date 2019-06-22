@@ -12,7 +12,7 @@ end)
 cpu_register_interrupt_handler(0x17, function(ax,ah,al)
 	-- printer
 	if (ah == 0x01) or (ah == 0x02) then
-		CPU["regs"][1] = CPU["regs"][1] & 0xFF
+		CPU["regs"][1] = CPU["regs"][1] -band- 0xFF
 		emu_debug(0, "printer: get port status/init\n")
 		return true
 	else

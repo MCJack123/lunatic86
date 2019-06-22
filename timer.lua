@@ -28,13 +28,13 @@ cpu_register_interrupt_handler(0x1A, function(ax,ah,al)
 			midnight = 1
 			timer_last_midnight = timer_last_midnight + timer_midnight
 		end
-		CPU["regs"][1] = (CPU["regs"][1] & 0xFF00) | midnight
-		CPU["regs"][2] = (timer_ticks >> 16) & 0xFFFF
-		CPU["regs"][3] = (timer_ticks & 0xFFFF)
+		CPU["regs"][1] = (CPU["regs"][1] -band- 0xFF00) -bor- midnight
+		CPU["regs"][2] = (timer_ticks -brshift- 16) -band- 0xFFFF
+		CPU["regs"][3] = (timer_ticks -band- 0xFFFF)
 		emu_debug(0, "time: get clock time\n")
 		return true
 	elseif (ah == 0x01) then
-		local timer_ticks = CPU["regs"][3] | (CPU["regs"][2] << 16)
+		local timer_ticks = CPU["regs"][3] -bor- (CPU["regs"][2] -blshift- 16)
 		set_timer_ticks(timer_ticks)
 		-- reset midnight flag
 		timer_last_midnight = 0

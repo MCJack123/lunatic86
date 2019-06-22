@@ -13,7 +13,7 @@ end)
 
 cpu_register_interrupt_handler(0x15, function(ax,ah,al)
 	emu_debug(1, string.format("unknown sysconf: %02X\n", ah))
-	CPU["regs"][1] = 0x8600 | (CPU["regs"][1] & 0xFF) -- AH = 0x86 (function not supported)
+	CPU["regs"][1] = 0x8600 -bor- (CPU["regs"][1] -band- 0xFF) -- AH = 0x86 (function not supported)
 	cpu_set_flag(0) -- set carry
 	return true
 end)
@@ -26,7 +26,7 @@ function sysconf_init()
 			fdd_count = i + 1
 		end
 	end
-	equipment = equipment | ((fdd_count - 1) << 6)
+	equipment = equipment -bor- ((fdd_count - 1) -blshift- 6)
 
 	RAM:w16(0x410, equipment) -- equipment list
 	RAM:w16(0x413, 640) -- memory size

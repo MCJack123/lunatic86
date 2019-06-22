@@ -20,7 +20,7 @@ local function disk_finder(fn)
 				end
 			end
 			if tmpfn ~= nil then
-				f = io.open(tmpfn, mode)
+				f = io_seek.open(tmpfn, mode)
 				disk_init_data(f, a)
 				f:seek("set", 0)
 				ptrmode = mode
