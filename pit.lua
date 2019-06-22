@@ -116,7 +116,7 @@ cpu_port_set(0x42, pit_data(3))
 cpu_port_set(0x43, function(cond, val)
 	if val then
 		emu_debug(2, "PIT write control " .. val)
-		pit_tick(os.clock())
+		pit_tick(os.epoch("utc") / 1000)
 		local c = (val -brshift- 6) + 1
 		if c < 4 then
 			pit_init(c,false)
