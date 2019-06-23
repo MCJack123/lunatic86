@@ -2072,8 +2072,7 @@ local clock = os.epoch("utc") / 1000
 run_one = function(no_interrupting, pr_state)
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
         emu_debug(2, "noblock " .. tostring(clock % 1000))
-        os.queueEvent("noblock")
-        os.pullEvent()
+        platform_kbd_tick()
         clock = os.epoch("utc") / 1000
     end
 
@@ -2091,8 +2090,7 @@ run_one = function(no_interrupting, pr_state)
 
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
             emu_debug(2, "noblock " .. tostring(clock % 1000))
-            os.queueEvent("noblock")
-            os.pullEvent()
+            platform_kbd_tick()
             clock = os.epoch("utc") / 1000
         end
     
@@ -2121,8 +2119,7 @@ run_one = function(no_interrupting, pr_state)
     
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
         emu_debug(2, "noblock " .. tostring(clock % 1000))
-        os.queueEvent("noblock")
-        os.pullEvent()
+        platform_kbd_tick()
         clock = os.epoch("utc") / 1000
     end
     
@@ -2203,12 +2200,13 @@ local function upd_tick(cv)
     video_update()
     keyboard_update()
     pit_tick(clock)
+    platform_kbd_tick()
     -- handle OC waits
     cv = os.epoch("utc") / 1000
     if (cv - clock) < 0.05 then
         oc_tick_i = oc_tick_i + 1
         -- if (oc_tick_i % 3) == 0 then
-        platform_sleep(0)
+        --platform_sleep(0)
         -- end
     end
     --cv = os.clock()
@@ -2236,8 +2234,7 @@ local function cpu_execute()
             upd_tick(os.epoch("utc") / 1000)
         elseif ((os.epoch("utc") / 1000) - clock) >= 1 then
             emu_debug(2, "noblock " .. tostring(clock % 1000))
-            os.queueEvent("noblock")
-            os.pullEvent()
+            platform_kbd_tick()
             clock = os.epoch("utc") / 1000
         end
         opc = opc + 1

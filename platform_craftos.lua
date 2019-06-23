@@ -3,6 +3,7 @@ if termw < 80 or termh < 25 then error("Terminal size must be >= 80x25") end
 local keysDown = {}
 local lastKey = nil
 local crash_on_gfx_fail = false
+os.loadAPI("CCKit/CCLog.lua")
 
 band = {}
 bor = {}
@@ -240,7 +241,7 @@ end}
 
 function platform_sleep(t)
     -- for what pvrpose
-    platform_kbd_tick()
+    --platform_kbd_tick()
 	os.sleep(t)
 end
 
@@ -290,6 +291,7 @@ function platform_getc()
     elseif ev == "key_up" then
         last_key = nil
     end
+    if ev ~= "noblock" then return -1 end
 	return nil
 end
 
@@ -297,7 +299,10 @@ function platform_error(msg)
     platform_finish()
     term.clear()
     term.setCursorPos(1, 1)
-    printError(msg)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.red)
+    CCLog.default:traceback("lunatic86", msg)
+    CCLog.default:close()
     error(msg, 2)
 end
 
@@ -316,6 +321,36 @@ function platform_render_cga_mono(vram, addr)
     emu_debug(2, "Graphics mode: CGA Mono")
     if not term.getGraphicsMode then if crash_on_gfx_fail then error("Graphics modes require CraftOS-PC v1.2 or later.") else return end end
     --term.setGraphicsMode(true)
+end
+
+local cga_palettes = {
+    [0] = {[0] = 1, 4, 16, 64},
+    {[0] = 1, 1024, 4096, 16384},
+    {[0] = 1, 8, 32, 128},
+    {[0] = 1, 2048, 8192, 32768},
+    {[0] = 1, 8, 16, 128},
+    {[0] = 1, 2048, 4096, 32768}
+}
+
+function platform_render_cga_color(vram, addr, mode)
+    platform_kbd_tick()
+    emu_debug(2, "Graphics mode: CGA Color")
+    if not term.getGraphicsMode then if crash_on_gfx_fail then error("Graphics modes require CraftOS-PC v1.2 or later.") else return end end
+    if not term.getGraphicsMode() then term.setGraphicsMode(true) end
+    local pnum = ((cga_get_palette() -band- 0x30) -brshift- 4) + (mode == 5 and 2 or 0)
+    emu_debug(2, "using palette " .. pnum)
+    local palette = cga_palettes[pnum]
+    local dlines = video_pop_dirty_lines()
+	for y,v in pairs(dlines) do
+		local base = addr + (y * 80)
+		for x=0,79 do
+            local chr = vram[base + x] or 0
+            term.setPixel(x*4, y, palette[(chr -brshift- 6) -band- 3])
+            term.setPixel(x*4+1, y, palette[(chr -brshift- 4) -band- 3])
+            term.setPixel(x*4+2, y, palette[(chr -brshift- 2) -band- 3])
+            term.setPixel(x*4+3, y, palette[(chr -brshift- 0) -band- 3])
+		end
+	end
 end
 
 function platform_render_mcga_13h(vram, addr)

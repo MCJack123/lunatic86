@@ -3,7 +3,6 @@ local drives = {}
 RAM[0x475] = 0
 
 local function disk_init_data(fptr, d)
-    print("Loading disk...")
 	local fsize = 0
 	if fptr ~= nil then
 		fsize = fptr:seek("end")

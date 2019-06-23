@@ -88,10 +88,10 @@ end
 
 for dk,did in pairs(drive_map) do
 	if argp[dk] then
-		disk_init(argp[dk],did)
+		disk_init(fs.exists(shell.resolve(argp[dk])) and shell.resolve(argp[dk]) or argp[dk],did)
 	end
 end
-
+print("Loading...")
 disk_boot(drive_map[argp["boot"]])
 setEGAColors()
 term.setBackgroundColor(1)
