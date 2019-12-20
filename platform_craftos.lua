@@ -117,7 +117,7 @@ io_seek = {open = function(_sPath, _sMode)
                     end
                 elseif whence == "end" then
                     file.close()
-                    file = fs.open(_sPath, "r")
+                    file = fs.open(_sPath, "rb")
                     local sz = 0
                     while file.read() ~= nil do sz = sz + 1 end
                     file.close()
@@ -237,11 +237,11 @@ io_seek = {open = function(_sPath, _sMode)
 		error( "Unsupported mode", 2 )
 		
     end
-end}
+end}--]] io_seek = io
 
 function platform_sleep(t)
     -- for what pvrpose
-    --platform_kbd_tick()
+    platform_kbd_tick()
 	os.sleep(t)
 end
 
@@ -277,22 +277,29 @@ local keys_to_char = {
 }
 
 -- non-blocking, returns (ascii char, bios scan code) or nil on none
-function platform_getc()
-    os.queueEvent("noblock")
+local nb = 0
+function platform_getc(queue)
+    if queue then
+        os.queueEvent("noblock")
+        nb = nb + 1
+    end
     local ev, c = os.pullEvent()
+    emu_debug(2, "nb: " .. nb .. ", Event: " .. ev)
     if ev == "key" then
         if c >= 0x80 then return nil end
         emu_debug(2, string.format("key %d %d", c, keys_to_char[c] or 0))
         last_key = c
-        if keys_to_char[c] then return keys_to_char[c], c else return -1 end
+        if keys_to_char[c] then return keys_to_char[c], c else return nil end
     elseif ev == "char" then
         emu_debug(2, string.format("char %s %d", c, string.byte(c)))
         return string.byte(c), last_key
     elseif ev == "key_up" then
         last_key = nil
+    elseif ev == "noblock" then
+        nb = nb - 1
+        return -1
     end
-    if ev ~= "noblock" then return -1 end
-	return nil
+    return nil
 end
 
 function platform_error(msg)
@@ -301,19 +308,25 @@ function platform_error(msg)
     term.setCursorPos(1, 1)
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.red)
-    CCLog.default:traceback("lunatic86", msg)
-    CCLog.default:close()
+    if CCLog then CCLog.default:traceback("lunatic86", msg) end
+    if CCLog then CCLog.default:close() end
+    printError(msg)
     error(msg, 2)
 end
 
 function platform_kbd_tick()
+    emu_debug(2, "Keyboard tick")
     local getmore = true
-    while getmore do
-		local ch, code = platform_getc()
+    local first = true
+    repeat
+		local ch, code = platform_getc(first)
 		if ch ~= nil and ch ~= -1 then
-			kbd_send_ibm(code, ch)
-        elseif ch ~= -1 then getmore = false end
-	end
+            kbd_send_ibm(code, ch)
+            getmore = true
+        elseif ch == -1 then getmore = false 
+        else getmore = true end
+        first = false
+	until not getmore
 end
 
 function platform_render_cga_mono(vram, addr)
@@ -387,7 +400,7 @@ function platform_render_text(vram, addr, width, height, pitch)
 			local chr = vram[base + x*2] or 0
             local atr = vram[base + x*2 + 1] or 0
             local fg = bit.band(atr, 0x0F)
-            local bg = bit.brshift(atr, 4)
+            local bg = bit.band(bit.blogic_rshift(atr, 4), 0x0F)
             term.setCursorPos(x+1, y+1)
             term.blit(string.char(chr), string.sub("0123456789abcdef", fg+1, fg+1), string.sub("0123456789abcdef", bg+1, bg+1))
 		end
@@ -438,3 +451,4 @@ function setEGAColors()
 end
 
 dofile(pwd .. "emu_core.lua")
+
