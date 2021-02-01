@@ -3,7 +3,7 @@ if termw < 80 or termh < 25 then error("Terminal size must be >= 80x25") end
 local keysDown = {}
 local lastKey = nil
 local crash_on_gfx_fail = false
-os.loadAPI("CCKit/CCLog.lua")
+--os.loadAPI("CCKit/CCLog.lua")
 
 band = {}
 bor = {}
@@ -13,31 +13,31 @@ blshift = {}
 brshift = {}
 
 setmetatable(band, {__sub = function(lhs)
-    local mt = {lhs, __sub = function(self, b) return bit.band(self[1], b) end}
+    local mt = {lhs, __sub = function(self, b) return bit32.band(self[1], b) end}
     return setmetatable(mt, mt)
 end})
 
 setmetatable(bor, {__sub = function(lhs)
-    local mt = {lhs, __sub = function(self, b) return bit.bor(self[1], b) end}
+    local mt = {lhs, __sub = function(self, b) return bit32.bor(self[1], b) end}
     return setmetatable(mt, mt)
 end})
 
 setmetatable(bxor, {__sub = function(lhs)
-    local mt = {lhs, __sub = function(self, b) return bit.bxor(self[1], b) end}
+    local mt = {lhs, __sub = function(self, b) return bit32.bxor(self[1], b) end}
     return setmetatable(mt, mt)
 end})
 
 setmetatable(blshift, {__sub = function(lhs)
-    local mt = {lhs, __sub = function(self, b) return bit.blshift(self[1], b) end}
+    local mt = {lhs, __sub = function(self, b) return bit32.lshift(self[1], b) end}
     return setmetatable(mt, mt)
 end})
 
 setmetatable(brshift, {__sub = function(lhs)
-    local mt = {lhs, __sub = function(self, b) return bit.blogic_rshift(self[1], b) end}
+    local mt = {lhs, __sub = function(self, b) return bit32.rshift(self[1], b) end}
     return setmetatable(mt, mt)
 end})
 
-setmetatable(bnot, {__sub = function(_, rhs) return bit.bnot(rhs) end})
+setmetatable(bnot, {__sub = function(_, rhs) return bit32.bnot(rhs) end})
 
 io_seek = {open = function(_sPath, _sMode)
 
@@ -255,10 +255,11 @@ function platform_key_down(v)
 end
 
 local debugger = peripheral.wrap("left")
+local dbg_type = peripheral.getType("left")
 local dw, dh
 
 function emu_debug(level, s, tb)
-    if debugger then
+    if debugger and dbg_type == "monitor" then
         if not dw then dw, dh = debugger.getSize() end
         local x, y = debugger.getCursorPos()
         if y >= dh then
@@ -267,6 +268,8 @@ function emu_debug(level, s, tb)
         end
         debugger.setCursorPos(1, y + 1)
         debugger.write(s)
+    elseif debugger and dbg_type == "debugger" then
+        debugger.print(s)
 	end
 end
 
@@ -275,24 +278,37 @@ local keys_to_char = {
     [keys.enter] = 0x0D,
     [keys.backspace] = 0x7F
 }
+local key_conversion = {
+    [keys.up] = 0x48,
+    [keys.down] = 0x50,
+    [keys.left] = 0x4B,
+    [keys.right] = 0x4D,
+}
 
 -- non-blocking, returns (ascii char, bios scan code) or nil on none
-function platform_getc()
-    os.queueEvent("noblock")
+local nb = 0
+function platform_getc(queue)
+    if queue then
+        os.queueEvent("noblock")
+        nb = nb + 1
+    end
     local ev, c = os.pullEvent()
+    emu_debug(2, "nb: " .. nb .. ", Event: " .. ev)
     if ev == "key" then
         if c >= 0x80 then return nil end
         emu_debug(2, string.format("key %d %d", c, keys_to_char[c] or 0))
         last_key = c
-        if keys_to_char[c] then return keys_to_char[c], c else return -1 end
+        if keys_to_char[c] then return keys_to_char[c], c else return nil end
     elseif ev == "char" then
         emu_debug(2, string.format("char %s %d", c, string.byte(c)))
         return string.byte(c), last_key
     elseif ev == "key_up" then
         last_key = nil
+    elseif ev == "noblock" then
+        nb = nb - 1
+        return -1
     end
-    if ev ~= "noblock" then return -1 end
-	return nil
+    return nil
 end
 
 function platform_error(msg)
@@ -301,56 +317,84 @@ function platform_error(msg)
     term.setCursorPos(1, 1)
     term.setBackgroundColor(colors.black)
     term.setTextColor(colors.red)
-    CCLog.default:traceback("lunatic86", msg)
-    CCLog.default:close()
+    --CCLog.default:traceback("lunatic86", msg)
+    --CCLog.default:close()
     error(msg, 2)
 end
 
 function platform_kbd_tick()
+    emu_debug(2, "Keyboard tick")
     local getmore = true
-    while getmore do
-		local ch, code = platform_getc()
+    local first = true
+    repeat
+		local ch, code = platform_getc(first)
 		if ch ~= nil and ch ~= -1 then
-			kbd_send_ibm(code, ch)
-        elseif ch ~= -1 then getmore = false end
-	end
+            kbd_send_ibm(code, ch)
+            getmore = true
+        elseif ch == -1 then getmore = false 
+        else getmore = true end
+        first = false
+	until not getmore
 end
+
+local cga_mono_data = {}
 
 function platform_render_cga_mono(vram, addr)
 	platform_kbd_tick()
     emu_debug(2, "Graphics mode: CGA Mono")
     if not term.getGraphicsMode then if crash_on_gfx_fail then error("Graphics modes require CraftOS-PC v1.2 or later.") else return end end
-    --term.setGraphicsMode(true)
+    if not term.getGraphicsMode() then term.setGraphicsMode(true) term.clear() end
+    local dlines = video_pop_dirty_lines()
+    local fg = cga_get_palette() -band- 0x0F
+    for y,dline in pairs(dlines) do
+        cga_mono_data[y*8+1] = ""
+		-- y = 0..49 -> 0, 4, ... -> jump by two odd scanlines (160 bytes)
+		local base = addr + y*80
+		for x=dline[1],dline[2] do
+			-- left
+            local c1 = vram[base + x]
+            for i = 0, 7 do cga_mono_data[y*8+1] = cga_mono_data[y*8+1] .. string.char(bit32.btest(c1, bit32.lshift(1, i)) and fg or 0) end
+        end
+        for i = 2, 8 do cga_mono_data[y*8+i] = cga_mono_data[y*8+1] end
+    end
+    term.drawPixels(0, 0, cga_mono_data)
 end
 
 local cga_palettes = {
-    [0] = {[0] = 1, 4, 16, 64},
-    {[0] = 1, 1024, 4096, 16384},
-    {[0] = 1, 8, 32, 128},
-    {[0] = 1, 2048, 8192, 32768},
-    {[0] = 1, 8, 16, 128},
-    {[0] = 1, 2048, 4096, 32768}
+    [0] = {[0] = 0, 2, 4, 6},
+    {[0] = 0, 10, 12, 14},
+    {[0] = 0, 3, 5, 7},
+    {[0] = 0, 11, 13, 15},
+    {[0] = 0, 3, 16, 7},
+    {[0] = 0, 11, 12, 15}
 }
+
+local cga_color_data = {}
 
 function platform_render_cga_color(vram, addr, mode)
     platform_kbd_tick()
     emu_debug(2, "Graphics mode: CGA Color")
     if not term.getGraphicsMode then if crash_on_gfx_fail then error("Graphics modes require CraftOS-PC v1.2 or later.") else return end end
-    if not term.getGraphicsMode() then term.setGraphicsMode(true) end
+    if not term.getGraphicsMode() then term.setGraphicsMode(true) term.clear() end
     local pnum = ((cga_get_palette() -band- 0x30) -brshift- 4) + (mode == 5 and 2 or 0)
     emu_debug(2, "using palette " .. pnum)
     local palette = cga_palettes[pnum]
     local dlines = video_pop_dirty_lines()
 	for y,v in pairs(dlines) do
-		local base = addr + (y * 80)
+        local base = addr + (y * 80)
+        cga_color_data[y*4+1] = ""
 		for x=0,79 do
             local chr = vram[base + x] or 0
-            term.setPixel(x*4, y, palette[(chr -brshift- 6) -band- 3])
-            term.setPixel(x*4+1, y, palette[(chr -brshift- 4) -band- 3])
-            term.setPixel(x*4+2, y, palette[(chr -brshift- 2) -band- 3])
-            term.setPixel(x*4+3, y, palette[(chr -brshift- 0) -band- 3])
-		end
-	end
+            cga_color_data[y*4+1] = cga_color_data[y*4+1] .. string.char(palette[(chr -brshift- 6) -band- 3]) ..
+                                     string.char(palette[(chr -brshift- 4) -band- 3]) ..
+                                     string.char(palette[(chr -brshift- 2) -band- 3]) ..
+                                     string.char(palette[chr -band- 3])
+        end
+        cga_color_data[y*4+2] = cga_color_data[y*4+1]
+        cga_color_data[y*4+3] = cga_color_data[y*4+1]
+        cga_color_data[y*4+4] = cga_color_data[y*4+1]
+    end
+    term.drawPixels(0, 0, cga_color_data)
 end
 
 function platform_render_mcga_13h(vram, addr)
@@ -386,8 +430,8 @@ function platform_render_text(vram, addr, width, height, pitch)
 		for x=0,width-1 do
 			local chr = vram[base + x*2] or 0
             local atr = vram[base + x*2 + 1] or 0
-            local fg = bit.band(atr, 0x0F)
-            local bg = bit.brshift(atr, 4)
+            local fg = bit32.band(atr, 0x0F)
+            local bg = bit32.rshift(atr, 4)
             term.setCursorPos(x+1, y+1)
             term.blit(string.char(chr), string.sub("0123456789abcdef", fg+1, fg+1), string.sub("0123456789abcdef", bg+1, bg+1))
 		end
