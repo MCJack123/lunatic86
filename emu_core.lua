@@ -430,7 +430,7 @@ for i=0,2047 do
 end
 
 local function cpu_mod_rm(opcode, is_seg)
-    local modrm = cpu_advance_ip() -bor- ((opcode -band- 3) -blshift- 8) -bor- (is_seg or 0)
+    local modrm = (cpu_advance_ip() -bor- ((opcode -band- 3) -blshift- 8)) -bor- (is_seg or 0)
     local data = mrm_table[modrm]
     
     if data.cdisp == 0 then
@@ -492,7 +492,7 @@ for i = 0,255 do
 end
 
 local function cpu_write_parity(v)
-    CPU_FLAGS = CPU_FLAGS -band- 0xFFFB -bor- parity_table[v -band- 0xFF]
+    CPU_FLAGS = (CPU_FLAGS -band- 0xFFFB) -bor- parity_table[v -band- 0xFF]
 end
 
 
@@ -518,11 +518,11 @@ local function _cpu_uf_zsp(vr, opc)
     if (opc -band- 0x01) == 1 then
         cpu_write_flag(6, (vr -band- 0xFFFF) == 0)
         cpu_write_flag(7, (vr -band- 0x8000) ~= 0)
-        CPU_FLAGS = CPU_FLAGS -band- 0xFFFB -bor- parity_table[vr -band- 0xFF]
+        CPU_FLAGS = (CPU_FLAGS -band- 0xFFFB) -bor- parity_table[vr -band- 0xFF]
     else
         cpu_write_flag(6, (vr -band- 0xFF) == 0)
         cpu_write_flag(7, (vr -band- 0x80) ~= 0)
-        CPU_FLAGS = CPU_FLAGS -band- 0xFFFB -bor- parity_table[vr -band- 0xFF]
+        CPU_FLAGS = (CPU_FLAGS -band- 0xFFFB) -bor- parity_table[vr -band- 0xFF]
     end
 end
 
@@ -895,7 +895,7 @@ local function cpu_or(mrm, opc)
 end
 
 local function cpu_print_state(opcode, adv)
-    cpu_print(string.format("AX:%04X CX:%04X DX:%04X BX:%04X SP:%04X BP:%04X SI:%04X DI:%04X -bor- %04X %04X %04X %04X -bor- %04X",
+    cpu_print(string.format("AX:%04X CX:%04X DX:%04X BX:%04X SP:%04X BP:%04X SI:%04X DI:%04X | %04X %04X %04X %04X | %04X",
     CPU_REGS[1], CPU_REGS[2], CPU_REGS[3], CPU_REGS[4], CPU_REGS[5], CPU_REGS[6], CPU_REGS[7], CPU_REGS[8],
     CPU_SEGMENTS[1], CPU_SEGMENTS[2], CPU_SEGMENTS[3], CPU_SEGMENTS[4], CPU_FLAGS))
     -- cpu_print(string.format("%02X (flags %04X, seg ES %04X CS %04X SS %04X DS %04X)", opcode, CPU_FLAGS, CPU_SEGMENTS[1], CPU_SEGMENTS[2], CPU_SEGMENTS[3], CPU_SEGMENTS[4]))
@@ -1028,7 +1028,7 @@ local function cpu_int(cond)
     local addr = RAM:r16(cond * 4)
     local seg = RAM:r16(cond * 4 + 2)
     
-    
+
     
     cpu_push16(CPU_FLAGS)
     cpu_push16(CPU_SEGMENTS[2])
@@ -2071,7 +2071,7 @@ local clock = os.epoch("utc") / 1000
 
 run_one = function(no_interrupting, pr_state)
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
-        emu_debug(2, "noblock " .. tostring(clock % 1000))
+        emu_debug(2, "noblock " .. tostring(CPU_IP))
         platform_kbd_tick()
         clock = os.epoch("utc") / 1000
     end
@@ -2089,7 +2089,7 @@ run_one = function(no_interrupting, pr_state)
     end
 
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
-            emu_debug(2, "noblock " .. tostring(clock % 1000))
+            emu_debug(2, "noblock " .. tostring(CPU_IP))
             platform_kbd_tick()
             clock = os.epoch("utc") / 1000
         end
@@ -2110,15 +2110,15 @@ run_one = function(no_interrupting, pr_state)
     end
     
     local opcode = cpu_advance_ip()
-    
-    
+
+
     
     
     local om = opcode_map[opcode]
     
     
     if ((os.epoch("utc") / 1000) - clock) >= 1 then
-        emu_debug(2, "noblock " .. tostring(clock % 1000))
+        emu_debug(2, "noblock " .. tostring(CPU_IP))
         platform_kbd_tick()
         clock = os.epoch("utc") / 1000
     end
@@ -2233,7 +2233,7 @@ local function cpu_execute()
         elseif ((opc -band- 0x1FF) == 0) and ((os.epoch("utc") / 1000) - clock) >= 0.05 then
             upd_tick(os.epoch("utc") / 1000)
         elseif ((os.epoch("utc") / 1000) - clock) >= 1 then
-            emu_debug(2, "noblock " .. tostring(clock % 1000))
+            emu_debug(2, "noblock " .. tostring(CPU_IP))
             platform_kbd_tick()
             clock = os.epoch("utc") / 1000
         end
